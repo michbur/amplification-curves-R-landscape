@@ -2,6 +2,7 @@ library(deepdep)
 library(pbapply)
 library(dplyr)
 library(reshape2)
+library(igraph)
 
 package_names <- readLines("./data/pcr-packages.txt")
 
@@ -22,9 +23,14 @@ package_mtr <- lapply(package_deps[!(sapply(package_deps, inherits, what = "try-
   do.call(rbind, .)
 
 rownames(package_mtr) <- paste0("origin_", package_names[!(sapply(package_deps, inherits, what = "try-error"))])
-package_mtr
+edge_df <- package_mtr %>% 
+  melt %>% 
+  filter(value) %>% 
+  select(from = Var2, to = Var1) %>% 
+  mutate(to = gsub("origin_", "", x = to, fixed = TRUE))
+  
 
-data.frame(package_name = package_names, not_on_cran = sapply(package_deps, inherits, what = "try-error"),
+node_df <- data.frame(package_name = package_names, not_on_cran = sapply(package_deps, inherits, what = "try-error"),
            bioc = sapply(package_deps, function(ith_package) {
              if(!inherits(ith_package, what = "try-error")) {
                any("Biobase" == unique(ith_package[["origin"]])) 
@@ -35,5 +41,7 @@ data.frame(package_name = package_names, not_on_cran = sapply(package_deps, inhe
   mutate(location = ifelse(not_on_cran, "elsewhere", ifelse(bioc, "Bioconductor", "CRAN"))) %>% 
   select(package_name, location)
 
+pkg_graph <- graph_from_data_frame(edge_df, directed = TRUE, vertices = node_df)
+plot(pkg_graph)
 
 
